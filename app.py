@@ -231,7 +231,7 @@ def validate_portfolio(rows):
     return summary, style
 
 # -------------------------------------------------------------------
-# CALLBACK 2: DYNAMIC AI TUTOR GEMINI INTEGRATION
+# CALLBACK 2: FULL DYNAMIC RUNTIME MODEL DISCOVERY
 # -------------------------------------------------------------------
 @app.callback(
     Output("tutor-output", "children"),
@@ -253,33 +253,34 @@ def answer_student_question(n_clicks, question):
     """
     
     try:
-        # Step A: Query available models dynamically for this key
-        raw_models = list(client.models.list())
-        available_models = [
-            m.name.replace("models/", "") if hasattr(m, "name") else str(m)
-            for m in raw_models
-        ]
+        # Ask Google API directly what models this key has access to
+        available = []
+        for model in client.models.list():
+            # Check if model supports text generation
+            actions = getattr(model, "supported_actions", []) or getattr(model, "supported_generation_methods", [])
+            if not actions or "generateContent" in actions:
+                name = getattr(model, "name", str(model))
+                clean_name = name.replace("models/", "")
+                available.append(clean_name)
         
-        # Step B: Automatically pick an active flash model
-        target_model = None
-        for m in available_models:
-            if "flash" in m.lower():
-                target_model = m
-                break
-        
-        # Fallback to first available model
-        if not target_model and available_models:
-            target_model = available_models[0]
-            
-        if not target_model:
-            return "Error: No active models found for this API Key. Please verify your key at aistudio.google.com."
+        if not available:
+            return "Error: Your API key returned zero supported models. Please generate a key at aistudio.google.com."
 
-        # Step C: Generate content with the resolved active model
+        # Pick the first active available model from Google's runtime response
+        chosen_model = available[0]
+        
+        # Prefer a flash model if present in the list
+        for m in available:
+            if "flash" in m.lower():
+                chosen_model = m
+                break
+
         response = client.models.generate_content(
-            model=target_model,
+            model=chosen_model,
             contents=prompt,
         )
         return dcc.Markdown(response.text)
+        
     except Exception as e:
         return f"Error connecting to AI Tutor: {str(e)}"
 
