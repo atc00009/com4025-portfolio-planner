@@ -272,5 +272,7 @@ def update_dashboard(rows):
     return f"{total_marks} / 100", f"{total_count} Tasks", status_text, status_style, fig
 
 # 5. Run Server
+# 5. Run Server
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8050, debug=True)
+    port = int(os.environ.get('PORT', 8050))
+    app.run(host='0.0.0.0', port=port)
