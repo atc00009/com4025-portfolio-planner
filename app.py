@@ -253,24 +253,28 @@ def answer_student_question(n_clicks, question):
     """
     
     try:
-        # Step A: Dynamically list all available models for your specific API Key
-        available_models = [m.name for m in client.models.list()]
+        # Step A: Query available models dynamically for this key
+        raw_models = list(client.models.list())
+        available_models = [
+            m.name.replace("models/", "") if hasattr(m, "name") else str(m)
+            for m in raw_models
+        ]
         
-        # Step B: Pick an active model automatically (prioritizing flash models)
+        # Step B: Automatically pick an active flash model
         target_model = None
         for m in available_models:
-            if "flash" in m:
+            if "flash" in m.lower():
                 target_model = m
                 break
         
-        # Fallback to the first available model if no flash string matches
+        # Fallback to first available model
         if not target_model and available_models:
             target_model = available_models[0]
             
         if not target_model:
-            return "Error: No valid models found for this API key. Please generate a new key at aistudio.google.com."
+            return "Error: No active models found for this API Key. Please verify your key at aistudio.google.com."
 
-        # Step C: Generate content using the detected model
+        # Step C: Generate content with the resolved active model
         response = client.models.generate_content(
             model=target_model,
             contents=prompt,
