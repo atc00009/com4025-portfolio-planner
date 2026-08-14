@@ -231,7 +231,7 @@ def validate_portfolio(rows):
     return summary, style
 
 # -------------------------------------------------------------------
-# CALLBACK 2: AI TUTOR GEMINI INTEGRATION
+# CALLBACK 2: DYNAMIC AI TUTOR GEMINI INTEGRATION
 # -------------------------------------------------------------------
 @app.callback(
     Output("tutor-output", "children"),
@@ -253,8 +253,26 @@ def answer_student_question(n_clicks, question):
     """
     
     try:
+        # Step A: Dynamically list all available models for your specific API Key
+        available_models = [m.name for m in client.models.list()]
+        
+        # Step B: Pick an active model automatically (prioritizing flash models)
+        target_model = None
+        for m in available_models:
+            if "flash" in m:
+                target_model = m
+                break
+        
+        # Fallback to the first available model if no flash string matches
+        if not target_model and available_models:
+            target_model = available_models[0]
+            
+        if not target_model:
+            return "Error: No valid models found for this API key. Please generate a new key at aistudio.google.com."
+
+        # Step C: Generate content using the detected model
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=target_model,
             contents=prompt,
         )
         return dcc.Markdown(response.text)
