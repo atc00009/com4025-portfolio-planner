@@ -1,14 +1,14 @@
 import os
 from dash import Dash, dcc, html, Input, Output, State, dash_table
 import pandas as pd
-from google import genai
+from groq import Groq
 
 # Initialize Dash App
 app = Dash(__name__)
 server = app.server  # Required for Gunicorn / Render deployment
 
-# Initialize Gemini Client (uses GEMINI_API_KEY from Render environment variables)
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Initialize Groq Client (uses GROQ_API_KEY from Render environment variables)
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # -------------------------------------------------------------------
 # Task Data Structure based on COM4025 Brief
@@ -231,7 +231,7 @@ def validate_portfolio(rows):
     return summary, style
 
 # -------------------------------------------------------------------
-# CALLBACK 2: FULL DYNAMIC RUNTIME MODEL DISCOVERY
+# CALLBACK 2: GROQ LLAMA 3.3 70B INTEGRATION
 # -------------------------------------------------------------------
 @app.callback(
     Output("tutor-output", "children"),
@@ -243,43 +243,20 @@ def answer_student_question(n_clicks, question):
     if not question or question.strip() == "":
         return "Please enter a question about your COM4025 task!"
     
-    prompt = f"""
-    You are an expert AI tutor for the COM4025 module (Introduction to Operating Systems and Security).
-    Provide clear, step-by-step guidance for the student based on the official task brief rules:
-    - Must choose 3-5 tasks totaling 100 marks.
-    - Must select from all 3 sections (LO1: OS Design, LO2: OS Security, LO3: Performance Monitoring).
-    
-    Student Question: {question}
-    """
+    system_instruction = (
+        "You are an expert AI tutor for the COM4025 module (Introduction to Operating Systems and Security). "
+        "Provide clear, step-by-step guidance based on official brief rules: select 3-5 tasks totaling 100 marks across all 3 sections."
+    )
     
     try:
-        # Ask Google API directly what models this key has access to
-        available = []
-        for model in client.models.list():
-            # Check if model supports text generation
-            actions = getattr(model, "supported_actions", []) or getattr(model, "supported_generation_methods", [])
-            if not actions or "generateContent" in actions:
-                name = getattr(model, "name", str(model))
-                clean_name = name.replace("models/", "")
-                available.append(clean_name)
-        
-        if not available:
-            return "Error: Your API key returned zero supported models. Please generate a key at aistudio.google.com."
-
-        # Pick the first active available model from Google's runtime response
-        chosen_model = available[0]
-        
-        # Prefer a flash model if present in the list
-        for m in available:
-            if "flash" in m.lower():
-                chosen_model = m
-                break
-
-        response = client.models.generate_content(
-            model=chosen_model,
-            contents=prompt,
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": question}
+            ]
         )
-        return dcc.Markdown(response.text)
+        return dcc.Markdown(response.choices[0].message.content)
         
     except Exception as e:
         return f"Error connecting to AI Tutor: {str(e)}"
