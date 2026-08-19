@@ -231,8 +231,17 @@ def validate_portfolio(rows):
     return summary, style
 
 # -------------------------------------------------------------------
-# CALLBACK 2: GROQ LLAMA 3.3 70B INTEGRATION
+# CALLBACK 2: GROQ AI TUTOR INTEGRATION (with model fallback)
 # -------------------------------------------------------------------
+# Note: llama-3.3-70b-versatile and llama-3.1-8b-instant have been
+# deprecated by Groq. Using current recommended replacements, tried
+# in order so the tutor keeps working even if one model is unavailable.
+FALLBACK_MODELS = [
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.6-27b",
+    "openai/gpt-oss-20b"
+]
+
 @app.callback(
     Output("tutor-output", "children"),
     Input("ask-btn", "n_clicks"),
@@ -247,19 +256,24 @@ def answer_student_question(n_clicks, question):
         "You are an expert AI tutor for the COM4025 module (Introduction to Operating Systems and Security). "
         "Provide clear, step-by-step guidance based on official brief rules: select 3-5 tasks totaling 100 marks across all 3 sections."
     )
-    
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": question}
-            ]
-        )
-        return dcc.Markdown(response.choices[0].message.content)
-        
-    except Exception as e:
-        return f"Error connecting to AI Tutor: {str(e)}"
+
+    last_error = None
+
+    for model_name in FALLBACK_MODELS:
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": question}
+                ]
+            )
+            return dcc.Markdown(response.choices[0].message.content)
+        except Exception as e:
+            last_error = e
+            continue
+
+    return f"Error connecting to AI Tutor across all fallback models. Last error: {str(last_error)}"
 
 # -------------------------------------------------------------------
 # SERVER RUNNER
